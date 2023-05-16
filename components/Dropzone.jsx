@@ -1,22 +1,78 @@
 'use client'
 
-import {useCallback} from 'react'
+import {useCallback, useState} from 'react'
 import {useDropzone} from 'react-dropzone'
+import Image from 'next/image'
+import { HiOutlineX, HiUpload } from "react-icons/hi";
+import { CldUploadWidget } from 'next-cloudinary';
 
 const Dropzone = () => {
-  const onDrop = useCallback(acceptedFiles => {
+  const [files, setFiles] = useState([]);
+  const [rejectedFiles, setRejectedFiles] = useState([]);
+
+  const onDrop = useCallback((acceptedFiles, rejectedFiles) => {
     // Do something with the files
-    console.log(acceptedFiles)
+    if(acceptedFiles?.length) {
+        //get any previous files we have, since we want users to upload multiple files.
+        setFiles(previousFiles => [
+        ...previousFiles,
+        ...acceptedFiles.map(file =>
+        //Object.assign basically does the same thing as a spread operator, itll copy the file and add the contents of the preview onto it.
+        Object.assign(file, {preview: URL.createObjectURL(file)}))
+        ])
+    }
+
+    if (rejectedFiles?.length) {
+        setRejectedFiles(previousFiles => [...previousFiles, ...rejectedFiles])
+    }
   }, [])
 
   //you call the onDrop method to get the access to two functions down below
   //getInputProps gives us the event listeners for the click, drag and drop click events.
-  const {getRootProps, getInputProps, isDragActive} = useDropzone({onDrop})
+  const {getRootProps, getInputProps, isDragActive} = useDropzone({onDrop, 
+    accept: {
+    'image/*': []
+    },
+    maxSize: 1024 * 1000
+
+})
+
+  const removeFile = (name) => {
+    setFiles(files.filter(file => file.name!== name))
+  }
+
+  const removeAll = () => {
+    setFiles([])
+    setRejectedFiles([])
+  }
+
+  const removeRejected = (name) => {
+    setRejectedFiles(files => files.filter(({file}) => file.name !== name))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
+    if (!files?.length) return
+
+    const formData = new FormData()
+    files.forEach(file => formData.append('file', file))
+    formData.append('upload_preset', 'ml_default')
+
+    const URL = process.env.NEXT_PUBLIC_CLOUDINARY_URL
+    const data = await fetch(`${URL}/image/upload`, {
+      method: 'POST',
+      body: formData
+    }).then(res => res.json())
+
+    console.log(data)
+  }
 
   return (
-    <form>
-        <div {...getRootProps()}>
+    <form onSubmit={handleSubmit}>
+        <div {...getRootProps()} className='p-16 mt-10 border border-neutral-200 flex flex-center flex-col mt-10'>
           <input {...getInputProps()} />
+            <HiUpload className='w-5 h-5 fill-current mb-5' />
             {     
             isDragActive ? (
             <p>Drop the files here...</p>
@@ -24,6 +80,98 @@ const Dropzone = () => {
             <p>Drag and drop some files here, or click to select files</p>
             )}
         </div>
+
+          {/* Preview */}
+      <section className='mt-10'>
+      <div className='flex gap-4'>
+          <h2 className='title text-3xl font-semibold'>Preview</h2>
+          <button
+            type='button'
+            onClick={removeAll}
+            className='mt-1 text-[12px] uppercase tracking-wider font-bold text-neutral-500 border border-secondary-400 rounded-md px-3 hover:bg-secondary-400 hover:text-blue transition-colors'
+          >
+            Remove all files
+          </button>
+          <button
+            type='submit'
+            className='ml-auto mt-1 text-[12px] uppercase tracking-wider font-bold text-neutral-500 border border-purple-400 rounded-md px-3 hover:bg-purple-400 hover:text-white transition-colors'
+          >
+            Upload to Cloudinary
+          </button>
+
+          {/* <CldUploadWidget uploadPreset="<Upload Preset>">
+  {({ open }) => {
+    function handleOnClick(e) {
+      e.preventDefault();
+      open();
+    }
+    return (
+      <button className="button" onClick={handleOnClick}>
+        Upload an Image
+      </button>
+    );
+  }}
+</CldUploadWidget> */}
+        </div>
+        {/* Accepted files */}
+        <h3 className='title text-lg font-semibold text-neutral-600 mt-10 border-b pb-3'>
+          Accepted Files
+        </h3>
+        <ul className='mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-10'>
+          {files.map(file => (
+            <li key={file.name} className='relative h-32 rounded-md shadow-lg'>
+              <Image
+                src={file.preview}
+                alt={file.name}
+                width={100}
+                height={100}
+                onLoad={() => {
+                  URL.revokeObjectURL(file.preview)
+                }}
+                className='h-full w-full object-contain rounded-md'
+              />
+              <button
+                type='button'
+                className='w-7 h-7 border border-secondary-400 bg-secondary-400 rounded-full flex justify-center items-center absolute -top-3 -right-3 hover:bg-white transition-colors'
+                onClick={() => removeFile(file.name)}
+              >
+                <HiOutlineX className='w-5 h-5 fill-white hover:fill-secondary-400 transition-colors' />
+              </button>
+              <p className='mt-2 text-neutral-500 text-[12px] font-medium'>
+                {file.name}
+              </p>
+            </li>
+          ))}
+        </ul>
+
+        {/* Rejected Files */}
+        <h3 className='title text-lg font-semibold text-neutral-600 mt-24 border-b pb-3'>
+          Rejected Files
+        </h3>
+        <ul className='mt-6 flex flex-col'>
+          {rejectedFiles.map(({ file, errors }) => (
+            <li key={file.name} className='flex items-start justify-between'>
+              <div>
+                <p className='mt-2 text-neutral-500 text-sm font-medium'>
+                  {file.name}
+                </p>
+                <ul className='text-[12px] text-red-400'>
+                  {errors.map(error => (
+                    <li key={error.code}>{error.message}</li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                type='button'
+                className='mt-1 py-1 text-[12px] uppercase tracking-wider font-bold text-neutral-500 border border-secondary-400 rounded-md px-3 hover:bg-secondary-400 hover:text-white transition-colors'
+                onClick={() => removeRejected(file.name)}
+              >
+                remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
     </form>
   )
 }
