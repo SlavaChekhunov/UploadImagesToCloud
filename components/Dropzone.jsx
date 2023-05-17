@@ -4,13 +4,24 @@ import {useCallback, useState} from 'react'
 import {useDropzone} from 'react-dropzone'
 import Image from 'next/image'
 import { HiOutlineX, HiUpload } from "react-icons/hi";
-import { CldUploadWidget } from 'next-cloudinary';
 
 const Dropzone = () => {
   const [files, setFiles] = useState([]);
   const [rejectedFiles, setRejectedFiles] = useState([]);
 
+  const handleDragOver = (event) => {
+    event.preventDefault(); // Allow dropping
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    const data = event.dataTransfer.getData('text/plain');
+    const draggedButton = document.getElementById(data);
+    event.target.appendChild(draggedButton);
+  };
+
   const onDrop = useCallback((acceptedFiles, rejectedFiles) => {
+    console.log(acceptedFiles);
     // Do something with the files
     if(acceptedFiles?.length) {
         //get any previous files we have, since we want users to upload multiple files.
@@ -31,7 +42,8 @@ const Dropzone = () => {
   //getInputProps gives us the event listeners for the click, drag and drop click events.
   const {getRootProps, getInputProps, isDragActive} = useDropzone({onDrop, 
     accept: {
-    'image/*': []
+    'image/*': [],
+    'text/html': ['.html', '.htm'],
     },
     maxSize: 1024 * 1000
 
@@ -70,7 +82,9 @@ const Dropzone = () => {
 
   return (
     <form onSubmit={handleSubmit}>
-        <div {...getRootProps()} className='p-16 mt-10 border border-neutral-200 flex flex-center flex-col mt-10'>
+        <div {...getRootProps()} className='p-16 mt-10 border border-neutral-200 flex flex-center flex-col mt-10'
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}>
           <input {...getInputProps()} />
             <HiUpload className='w-5 h-5 fill-current mb-5' />
             {     
@@ -98,20 +112,6 @@ const Dropzone = () => {
           >
             Upload to Cloudinary
           </button>
-
-          {/* <CldUploadWidget uploadPreset="<Upload Preset>">
-  {({ open }) => {
-    function handleOnClick(e) {
-      e.preventDefault();
-      open();
-    }
-    return (
-      <button className="button" onClick={handleOnClick}>
-        Upload an Image
-      </button>
-    );
-  }}
-</CldUploadWidget> */}
         </div>
         {/* Accepted files */}
         <h3 className='title text-lg font-semibold text-neutral-600 mt-10 border-b pb-3'>
